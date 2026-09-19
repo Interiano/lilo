@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lilo — Lock In or Log Off</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --card: #1a2130;
+    --ink: #eef2f8;
+    --muted: #8b95a7;
+    --line: #2a3345;
+    --accent: #f5a623;
+    --go: #3b82f6;
+    --danger: #ef4444;
+    --done: #22c55e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--ink);
+    display: flex; justify-content: center; padding: 32px 16px;
+  }
+  .wrap { width: 100%; max-width: 520px; }
+  h1 { font-size: 1.8rem; margin: 0; letter-spacing: -0.5px; }
+  .tag { color: var(--muted); margin: 2px 0 24px; font-size: 0.9rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px; margin-bottom: 16px; }
+  button { font: inherit; cursor: pointer; border-radius: 9px; border: 1px solid transparent; }
+  .btn-primary { background: var(--go); color: #fff; padding: 11px 18px; font-weight: 600; }
+  .btn-ghost { background: transparent; border-color: var(--line); color: var(--ink); padding: 8px 14px; }
+  .btn-link { background: none; border: none; color: var(--muted); padding: 4px 8px; font-size: 0.85rem; }
+  .btn-link:hover { color: var(--danger); }
+  .streak-head { display: flex; align-items: center; gap: 16px; }
+  .mascot { font-size: 3rem; line-height: 1; }
+  .streak-num { font-size: 2.4rem; font-weight: 800; color: var(--accent); }
+  .streak-label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+  .nudge { margin-top: 14px; font-size: 0.95rem; }
+  .nudge.rest { color: var(--muted); }
+  .section-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 0 0 12px; }
+  .task-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .task-row:last-child { border-bottom: none; }
+  .check { width: 26px; height: 26px; border-radius: 7px; border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: transparent; color: transparent; font-weight: 800; }
+  .task-row.done .check { background: var(--done); border-color: var(--done); color: #fff; }
+  .task-row.done .name { color: var(--muted); text-decoration: line-through; }
+  .name { flex: 1; }
+  input[type=text] { width: 100%; font: inherit; padding: 11px 12px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); color: var(--ink); }
+  .days { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .day { padding: 8px 0; width: 40px; text-align: center; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); font-size: 0.8rem; }
+  .day.on { background: var(--go); border-color: var(--go); color: #fff; font-weight: 600; }
+  .habit-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .habit-row:last-child { border-bottom: none; }
+  .habit-days { color: var(--muted); font-size: 0.75rem; margin-top: 2px; }
+  .status { margin-top: 12px; font-size: 0.85rem; color: var(--muted); min-height: 1.1em; }
+  .status.error { color: var(--danger); }
+  .empty { color: var(--muted); padding: 8px 0; font-size: 0.9rem; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Lilo</h1>
+  <p class="tag">Lock In or Log Off.</p>
+
+  <div id="signed-out" class="card">
+    <p>Your streak is waiting. Sign in to start locking in.</p>
+    <button id="signin" class="btn-primary">Sign in / Sign up</button>
+  </div>
+
+  <div id="signed-in" hidden>
+    <div class="card">
+      <div class="streak-head">
+        <div class="mascot" id="mascot">⭐</div>
+        <div>
+          <div class="streak-num" id="streak-num">0</div>
+          <div class="streak-label">day streak</div>
+        </div>
+        <button id="signout" class="btn-ghost" style="margin-left:auto;">Sign out</button>
+      </div>
+      <div class="nudge" id="nudge"></div>
+    </div>
+
+    <div class="card">
+      <p class="section-title">Today</p>
+      <div id="today-list"></div>
+      <p class="empty" id="rest-note" hidden>🌴 Nothing due today. Rest up — your streak is safe.</p>
+      <p class="status" id="status"></p>
+    </div>
+
+    <div class="card">
+      <p class="section-title">Your habits</p>
+      <input type="text" id="habit-name" placeholder="New habit (e.g. Read 10 pages)" autocomplete="off" />
+      <div class="days" id="day-picker">
+        <button class="day on" data-day="mon">M</button>
+        <button class="day on" data-day="tue">T</button>
+        <button class="day on" data-day="wed">W</button>
+        <button class="day on" data-day="thu">T</button>
+        <button class="day on" data-day="fri">F</button>
+        <button class="day on" data-day="sat">S</button>
+        <button class="day on" data-day="sun">S</button>
+      </div>
+      <button id="add-habit" class="btn-primary">Add habit</button>
+      <div id="habit-list" style="margin-top:16px;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CONFIG = {
+  userPoolDomain: "https://us-east-1guikam9t7.auth.us-east-1.amazoncognito.com",
+  clientId:       "5mbkkscbh1fb7a19cntd348mpa",
+  redirectUri:    "http://localhost:5500",
+  apiUrl:         "https://u8izmtak6f.execute-api.us-east-1.amazonaws.com",
+  scopes:         "openid email",
+};
+
+const el = (id) => document.getElementById(id);
+const status = (m, err=false) => { const s = el("status"); s.textContent = m||""; s.classList.toggle("error", !!err); };
+
+function localDate() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+function base64url(bytes){ return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
+async function sha256(s){ return await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)); }
+function randomString(){ const a=new Uint8Array(48); crypto.getRandomValues(a); return base64url(a); }
+
+async function startLogin(){
+  const verifier = randomString();
+  sessionStorage.setItem("pkce_verifier", verifier);
+  const challenge = base64url(await sha256(verifier));
+  const u = new URL(CONFIG.userPoolDomain + "/oauth2/authorize");
+  u.searchParams.set("response_type","code");
+  u.searchParams.set("client_id", CONFIG.clientId);
+  u.searchParams.set("redirect_uri", CONFIG.redirectUri);
+  u.searchParams.set("scope", CONFIG.scopes);
+  u.searchParams.set("code_challenge", challenge);
+  u.searchParams.set("code_challenge_method","S256");
+  window.location.href = u.toString();
+}
+async function exchangeCode(code){
+  const verifier = sessionStorage.getItem("pkce_verifier");
+  const body = new URLSearchParams({ grant_type:"authorization_code", client_id:CONFIG.clientId, code, redirect_uri:CONFIG.redirectUri, code_verifier:verifier });
+  const res = await fetch(CONFIG.userPoolDomain + "/oauth2/token", { method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"}, body });
+  if(!res.ok) throw new Error("Token exchange failed ("+res.status+")");
+  return await res.json();
+}
+function signOut(){
+  sessionStorage.clear();
+  const u = new URL(CONFIG.userPoolDomain + "/logout");
+  u.searchParams.set("client_id", CONFIG.clientId);
+  u.searchParams.set("logout_uri", CONFIG.redirectUri);
+  window.location.href = u.toString();
+}
+const idToken = () => sessionStorage.getItem("id_token");
+
+async function api(path, opts={}){
+  const res = await fetch(CONFIG.apiUrl + path, {
+    ...opts,
+    headers: { "Authorization":"Bearer "+idToken(), "Content-Type":"application/json", ...(opts.headers||{}) },
+  });
+  if(res.status === 401) throw new Error("Session expired — sign in again.");
+  return res;
+}
+
+let STATE = { tasks:[], scheduledToday:[], completedToday:[], streak:0 };
+
+async function loadDashboard(){
+  status("Loading…");
+  try {
+    const res = await api("/dashboard?today=" + localDate());
+    if(!res.ok) throw new Error("Load failed ("+res.status+")");
+    STATE = await res.json();
+    render();
+    status("");
+  } catch(e){ status(e.message, true); }
+}
+
+async function addHabit(){
+  const name = el("habit-name").value.trim();
+  if(!name){ status("Give it a name.", true); return; }
+  const days = [...document.querySelectorAll(".day.on")].map(b => b.dataset.day);
+  if(days.length === 0){ status("Pick at least one day.", true); return; }
+  status("Adding…");
+  try {
+    const res = await api("/tasks", { method:"POST", body: JSON.stringify({ taskName:name, activeDays:days, localDate:localDate() }) });
+    if(!res.ok) throw new Error("Add failed ("+res.status+")");
+    el("habit-name").value = "";
+    await loadDashboard();
+  } catch(e){ status(e.message, true); }
+}
+
+async function deleteHabit(taskId){
+  status("Deleting…");
+  try {
+    const res = await api("/tasks/" + encodeURIComponent(taskId), { method:"DELETE" });
+    if(!res.ok && res.status !== 204) throw new Error("Delete failed ("+res.status+")");
+    await loadDashboard();
+  } catch(e){ status(e.message, true); }
+}
+
+async function checkOff(taskId){
+  status("");
+  try {
+    const res = await api("/tasks/" + encodeURIComponent(taskId) + "/check", { method:"POST", body: JSON.stringify({ today: localDate() }) });
+    if(!res.ok) throw new Error("Check failed ("+res.status+")");
+    await loadDashboard();
+  } catch(e){ status(e.message, true); }
+}
+
+const DAY_LABEL = { mon:"Mon", tue:"Tue", wed:"Wed", thu:"Thu", fri:"Fri", sat:"Sat", sun:"Sun" };
+function taskById(id){ return STATE.tasks.find(t => t.taskId === id); }
+
+function render(){
+  el("streak-num").textContent = STATE.streak;
+
+  const list = el("today-list");
+  list.innerHTML = "";
+  const scheduled = STATE.scheduledToday || [];
+  el("rest-note").hidden = scheduled.length > 0 || STATE.tasks.length === 0;
+
+  for(const id of scheduled){
+    const t = taskById(id);
+    if(!t) continue;
+    const done = (STATE.completedToday || []).includes(id);
+    const row = document.createElement("div");
+    row.className = "task-row" + (done ? " done" : "");
+    row.innerHTML = `<div class="check">✓</div><div class="name"></div>`;
+    row.querySelector(".name").textContent = t.taskName;
+        row.style.cursor = "pointer";
+    row.onclick = () => checkOff(id);
+    list.appendChild(row);
+  }
+
+  const total = scheduled.length;
+  const doneCount = scheduled.filter(id => (STATE.completedToday||[]).includes(id)).length;
+  const hasHabits = STATE.tasks.length > 0;
+  const m = el("mascot"), n = el("nudge");
+  n.classList.remove("rest");
+  if(!hasHabits){
+    m.textContent = "😾";
+    n.textContent = "No habits, no streak, no excuses. Add one below.";
+  } else if(total === 0){
+    m.textContent = "🌴"; n.classList.add("rest");
+    n.textContent = "Rest day. Nothing due — the streak's safe. Don't get comfortable.";
+  } else if(doneCount === total){
+    m.textContent = "🌟";
+    n.textContent = `Day locked in. Streak: ${STATE.streak} 🔥 — come back tomorrow or lose it.`;
+  } else if(STATE.streak === 0){
+    m.textContent = "⭐";
+    n.textContent = `No streak yet. ${doneCount}/${total} done. Finish today's list to start one.`;
+  } else {
+    m.textContent = "⭐";
+    n.textContent = `Streak: ${STATE.streak}. ${doneCount}/${total} done today. Lock in or log off.`;
+  }
+
+  const hl = el("habit-list");
+  hl.innerHTML = "";
+  if(STATE.tasks.length === 0){ hl.innerHTML = `<p class="empty">No habits yet. Add one above.</p>`; return; }
+  for(const t of STATE.tasks){
+    const row = document.createElement("div");
+    row.className = "habit-row";
+    const days = (t.activeDays||[]).map(d => DAY_LABEL[d]).join(" ");
+    row.innerHTML = `<div><div class="name"></div><div class="habit-days">${days}</div></div>`;
+    row.querySelector(".name").textContent = t.taskName;
+    const del = document.createElement("button");
+    del.className = "btn-link"; del.textContent = "Delete";
+    del.onclick = () => deleteHabit(t.taskId);
+    row.appendChild(del);
+    hl.appendChild(row);
+  }
+}
+
+el("signin").onclick = startLogin;
+el("signout").onclick = signOut;
+el("add-habit").onclick = addHabit;
+el("day-picker").addEventListener("click", (e) => {
+  if(e.target.classList.contains("day")) e.target.classList.toggle("on");
+});
+
+function showSignedIn(){ el("signed-out").hidden = true; el("signed-in").hidden = false; loadDashboard(); }
+function showSignedOut(){ el("signed-in").hidden = true; el("signed-out").hidden = false; }
+
+(async function boot(){
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  const err = params.get("error_description") || params.get("error");
+  if(err){ showSignedOut(); status(decodeURIComponent(err), true); return; }
+  if(code){
+    try {
+      const tokens = await exchangeCode(code);
+      sessionStorage.setItem("id_token", tokens.id_token);
+      window.history.replaceState({}, document.title, CONFIG.redirectUri);
+      showSignedIn();
+    } catch(e){ showSignedOut(); status(e.message, true); }
+    return;
+  }
+  if(idToken()) showSignedIn(); else showSignedOut();
+})();
+</script>
+</body>
+</html>
