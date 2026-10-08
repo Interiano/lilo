@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Lilo — Lock In or Log Off</title>
+<title>Lilo — Lock In and Log Off</title>
+<link rel="icon" type="image/png" href="favicon.png" />
 <style>
   :root {
     --bg: #0f1420;
@@ -24,8 +25,7 @@
     display: flex; justify-content: center; padding: 32px 16px;
   }
   .wrap { width: 100%; max-width: 520px; }
-  h1 { font-size: 1.8rem; margin: 0; letter-spacing: -0.5px; }
-  .tag { color: var(--muted); margin: 2px 0 24px; font-size: 0.9rem; }
+  h1 { font-size: 1.8rem; margin: 0 0 24px; letter-spacing: -0.5px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px; margin-bottom: 16px; }
   button { font: inherit; cursor: pointer; border-radius: 9px; border: 1px solid transparent; }
   .btn-primary { background: var(--go); color: #fff; padding: 11px 18px; font-weight: 600; }
@@ -33,9 +33,11 @@
   .btn-link { background: none; border: none; color: var(--muted); padding: 4px 8px; font-size: 0.85rem; }
   .btn-link:hover { color: var(--danger); }
   .streak-head { display: flex; align-items: center; gap: 16px; }
-  .mascot { font-size: 3rem; line-height: 1; }
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  .mascot { height: 72px; width: auto; animation: bob 2.6s ease-in-out infinite; }
   .streak-num { font-size: 2.4rem; font-weight: 800; color: var(--accent); }
   .streak-label { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+  .streak-label.best { color: var(--accent); }
   .nudge { margin-top: 14px; font-size: 0.95rem; }
   .nudge.rest { color: var(--muted); }
   .section-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 0 0 12px; }
@@ -60,8 +62,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Lilo</h1>
-  <p class="tag">Lock In or Log Off.</p>
+  <h1>Lock In and Log Off!</h1>
 
   <div id="signed-out" class="card">
     <p>Your streak is waiting. Sign in to start locking in.</p>
@@ -71,10 +72,11 @@
   <div id="signed-in" hidden>
     <div class="card">
       <div class="streak-head">
-        <div class="mascot" id="mascot">⭐</div>
+        <img class="mascot" id="mascot" src="mascots/menace.png" alt="Lilo mascot" />
         <div>
           <div class="streak-num" id="streak-num">0</div>
           <div class="streak-label">day streak</div>
+          <div class="streak-label best" id="best-streak"></div>
         </div>
         <button id="signout" class="btn-ghost" style="margin-left:auto;">Sign out</button>
       </div>
@@ -90,7 +92,7 @@
 
     <div class="card">
       <p class="section-title">Your habits</p>
-      <input type="text" id="habit-name" placeholder="New habit (e.g. Read 10 pages)" autocomplete="off" />
+      <input type="text" id="habit-name" placeholder="New habit (e.g. Read 10 pages)" autocomplete="off" maxlength="60" />
       <div class="days" id="day-picker">
         <button class="day on" data-day="mon">M</button>
         <button class="day on" data-day="tue">T</button>
@@ -165,7 +167,7 @@ async function api(path, opts={}){
   return res;
 }
 
-let STATE = { tasks:[], scheduledToday:[], completedToday:[], streak:0 };
+let STATE = { tasks:[], scheduledToday:[], completedToday:[], streak:0, longest:0 };
 
 async function loadDashboard(){
   status("Loading…");
@@ -175,12 +177,15 @@ async function loadDashboard(){
     STATE = await res.json();
     render();
     status("");
-  } catch(e){ status(e.message, true); }
+  } catch(e){ status("Couldn't reach Lilo. Check your connection and refresh.", true); }
 }
 
 async function addHabit(){
   const name = el("habit-name").value.trim();
   if(!name){ status("Give it a name.", true); return; }
+  if(name.length > 60){ status("Keep it under 60 characters.", true); return; }
+  const dup = STATE.tasks.some(t => t.taskName.toLowerCase() === name.toLowerCase());
+  if(dup){ status("You already have that habit.", true); return; }
   const days = [...document.querySelectorAll(".day.on")].map(b => b.dataset.day);
   if(days.length === 0){ status("Pick at least one day.", true); return; }
   status("Adding…");
@@ -189,16 +194,17 @@ async function addHabit(){
     if(!res.ok) throw new Error("Add failed ("+res.status+")");
     el("habit-name").value = "";
     await loadDashboard();
-  } catch(e){ status(e.message, true); }
+  } catch(e){ status("Couldn't add that habit. Try again.", true); }
 }
 
 async function deleteHabit(taskId){
+  if(!confirm("Delete this habit? This can't be undone.")) return;
   status("Deleting…");
   try {
     const res = await api("/tasks/" + encodeURIComponent(taskId), { method:"DELETE" });
     if(!res.ok && res.status !== 204) throw new Error("Delete failed ("+res.status+")");
     await loadDashboard();
-  } catch(e){ status(e.message, true); }
+  } catch(e){ status("Couldn't delete that habit. Try again.", true); }
 }
 
 async function checkOff(taskId){
@@ -207,7 +213,7 @@ async function checkOff(taskId){
     const res = await api("/tasks/" + encodeURIComponent(taskId) + "/check", { method:"POST", body: JSON.stringify({ today: localDate() }) });
     if(!res.ok) throw new Error("Check failed ("+res.status+")");
     await loadDashboard();
-  } catch(e){ status(e.message, true); }
+  } catch(e){ status("Couldn't update that task. Try again.", true); }
 }
 
 const DAY_LABEL = { mon:"Mon", tue:"Tue", wed:"Wed", thu:"Thu", fri:"Fri", sat:"Sat", sun:"Sun" };
@@ -229,7 +235,7 @@ function render(){
     row.className = "task-row" + (done ? " done" : "");
     row.innerHTML = `<div class="check">✓</div><div class="name"></div>`;
     row.querySelector(".name").textContent = t.taskName;
-        row.style.cursor = "pointer";
+    row.style.cursor = "pointer";
     row.onclick = () => checkOff(id);
     list.appendChild(row);
   }
@@ -240,21 +246,25 @@ function render(){
   const m = el("mascot"), n = el("nudge");
   n.classList.remove("rest");
   if(!hasHabits){
-    m.textContent = "😾";
+    m.src = "mascots/menace.png";
     n.textContent = "No habits, no streak, no excuses. Add one below.";
   } else if(total === 0){
-    m.textContent = "🌴"; n.classList.add("rest");
+    m.src = "mascots/congrats.png"; n.classList.add("rest");
     n.textContent = "Rest day. Nothing due — the streak's safe. Don't get comfortable.";
   } else if(doneCount === total){
-    m.textContent = "🌟";
-    n.textContent = `Day locked in. Streak: ${STATE.streak} 🔥 — come back tomorrow or lose it.`;
+    m.src = "mascots/celebrate.png";
+    n.textContent = `Day locked in. Streak: ${STATE.streak} — come back tomorrow or lose it.`;
   } else if(STATE.streak === 0){
-    m.textContent = "⭐";
+    m.src = "mascots/sad.png";
     n.textContent = `No streak yet. ${doneCount}/${total} done. Finish today's list to start one.`;
   } else {
-    m.textContent = "⭐";
+    m.src = "mascots/mad.png";
     n.textContent = `Streak: ${STATE.streak}. ${doneCount}/${total} done today. Lock in or log off.`;
   }
+
+  // longest streak
+  const best = el("best-streak");
+  best.textContent = (STATE.longest && STATE.longest > 0) ? `best: ${STATE.longest}` : "";
 
   const hl = el("habit-list");
   hl.innerHTML = "";
@@ -276,6 +286,7 @@ function render(){
 el("signin").onclick = startLogin;
 el("signout").onclick = signOut;
 el("add-habit").onclick = addHabit;
+el("habit-name").addEventListener("keydown", (e) => { if(e.key === "Enter") addHabit(); });
 el("day-picker").addEventListener("click", (e) => {
   if(e.target.classList.contains("day")) e.target.classList.toggle("on");
 });

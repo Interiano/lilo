@@ -6,4 +6,6 @@ Issuer URL:     https://cognito-idp.us-east-1.amazonaws.com/us-east-1_GuikAm9T7
 Hosted UI:      us-east-1guikam9t7.auth.us-east-1.amazoncognito.com
 Region:         us-east-1
 
+API 
 Invoke URL: https://u8izmtak6f.execute-api.us-east-1.amazonaws.com
+Routes: GET /dashboard, POST /tasks, DELETE /tasks/{taskId}, POST /tasks/{taskId}/check
