@@ -59,6 +59,18 @@
   .empty { color: var(--muted); padding: 8px 0; font-size: 0.9rem; }
   [hidden] { display: none !important; }
 
+  /* login hero (Concept A) */
+  .login-hero { text-align: center; padding: 8px 0 12px; }
+  .login-mascot { width: 150px; height: auto; margin-bottom: 8px; filter: drop-shadow(0 8px 24px rgba(0,0,0,.5)); animation: bob 2.6s ease-in-out infinite; }
+  .login-brand { font-size: 2.4rem; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
+  .login-brand .amp { color: var(--accent); }
+  .login-subline { color: var(--muted); font-size: 1rem; margin-bottom: 30px; letter-spacing: .3px; }
+  .login-manifesto { font-size: 1.8rem; font-weight: 800; line-height: 1.15; margin-bottom: 10px; }
+  .login-manifesto .no { color: var(--danger); }
+  .login-sub2 { color: var(--muted); font-size: .95rem; margin-bottom: 30px; }
+  .login-cta { width: 100%; font-size: 1.1rem; padding: 16px 0; border-radius: 12px; letter-spacing: .3px; }
+  .login-foot { margin-top: 18px; color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: 2px; }
+
   /* timer */
   .timer-box { text-align: center; transition: background 0.2s; }
   .timer-display { font-size: 2.6rem; font-weight: 800; color: var(--ink); letter-spacing: 2px; margin: 4px 0 14px; font-variant-numeric: tabular-nums; }
@@ -80,14 +92,19 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Lock In and Log Off!</h1>
 
-  <div id="signed-out" class="card">
-    <p>Your streak is waiting. Sign in to start locking in.</p>
-    <button id="signin" class="btn-primary">Sign in / Sign up</button>
+  <div id="signed-out" class="login-hero">
+    <img class="login-mascot" src="mascots/menace.png" alt="Lilo mascot" />
+    <div class="login-brand">Lock In <span class="amp">&amp;</span> Log Off</div>
+    <div class="login-subline">The habit tracker with an attitude.</div>
+    <div class="login-manifesto"><span class="no">No</span> habits.<br><span class="no">No</span> streak.<br><span class="no">No</span> excuses.</div>
+    <div class="login-sub2">Show up every day, or don't show up at all.</div>
+    <button id="signin" class="btn-primary login-cta">Sign in / Sign up →</button>
+    <div class="login-foot">Your streak starts today</div>
   </div>
 
   <div id="signed-in" hidden>
+    <h1>Lock In and Log Off!</h1>
     <div class="card">
       <div class="streak-head">
         <img class="mascot" id="mascot" src="mascots/menace.png" alt="Lilo mascot" />
