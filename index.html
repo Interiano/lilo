@@ -335,6 +335,12 @@ function render(){
   } else if(doneCount === total){
     m.src = "mascots/celebrate.png";
     n.textContent = `Day locked in. Streak: ${STATE.streak} — come back tomorrow or lose it.`;
+  } else if(STATE.streakBroken && STATE.streak === 0){
+    m.src = "mascots/guilt.png";
+    const lost = STATE.lastStreakLength || 0;
+    n.textContent = lost > 0
+      ? `You had a ${lost}-day streak. You let it die. ${doneCount}/${total} done — rebuild it.`
+      : `You broke your streak. ${doneCount}/${total} done today — start over.`;
   } else if(STATE.streak === 0){
     m.src = "mascots/sad.png";
     n.textContent = `No streak yet. ${doneCount}/${total} done. Finish today's list to start one.`;
