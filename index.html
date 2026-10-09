@@ -54,6 +54,12 @@
   .habit-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); }
   .habit-row:last-child { border-bottom: none; }
   .habit-days { color: var(--muted); font-size: 0.75rem; margin-top: 2px; }
+  .habit-btns { display: flex; gap: 2px; flex-shrink: 0; }
+  .edit-link:hover { color: var(--go); }
+  .habit-edit { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .habit-edit .edit-name { margin-bottom: 10px; }
+  .habit-edit .edit-actions { display: flex; gap: 8px; }
+  .habit-edit .edit-actions .btn-primary { padding: 9px 16px; }
   .status { margin-top: 12px; font-size: 0.85rem; color: var(--muted); min-height: 1.1em; }
   .status.error { color: var(--danger); }
   .empty { color: var(--muted); padding: 8px 0; font-size: 0.9rem; }
@@ -220,6 +226,7 @@ async function api(path, opts={}){
 }
 
 let STATE = { tasks:[], scheduledToday:[], completedToday:[], streak:0, longest:0 };
+let editingId = null;
 
 async function loadDashboard(){
   status("Loading…");
@@ -257,6 +264,28 @@ async function deleteHabit(taskId){
     if(!res.ok && res.status !== 204) throw new Error("Delete failed ("+res.status+")");
     await loadDashboard();
   } catch(e){ status("Couldn't delete that habit. Try again.", true); }
+}
+
+function startEdit(taskId){ editingId = taskId; render(); }
+function cancelEdit(){ editingId = null; render(); }
+
+async function saveEdit(taskId){
+  const nameEl = document.getElementById("edit-name-" + taskId);
+  const name = nameEl.value.trim();
+  if(!name){ status("Give it a name.", true); return; }
+  if(name.length > 60){ status("Keep it under 60 characters.", true); return; }
+  const days = [...document.querySelectorAll("#edit-days-" + taskId + " .day.on")].map(b => b.dataset.day);
+  if(days.length === 0){ status("Pick at least one day.", true); return; }
+  status("Saving…");
+  try {
+    const res = await api("/tasks/" + encodeURIComponent(taskId), {
+      method: "PUT",
+      body: JSON.stringify({ taskName: name, activeDays: days }),
+    });
+    if(!res.ok) throw new Error("Update failed ("+res.status+")");
+    editingId = null;
+    await loadDashboard();
+  } catch(e){ status("Couldn't save that change. Try again.", true); }
 }
 
 async function checkOff(taskId){
@@ -321,16 +350,53 @@ function render(){
   const hl = el("habit-list");
   hl.innerHTML = "";
   if(STATE.tasks.length === 0){ hl.innerHTML = `<p class="empty">No habits yet. Add one above.</p>`; return; }
+  const DAY_DEFS = [["mon","M"],["tue","T"],["wed","W"],["thu","T"],["fri","F"],["sat","S"],["sun","S"]];
   for(const t of STATE.tasks){
+    if(editingId === t.taskId){
+      // ---- inline editor ----
+      const ed = document.createElement("div");
+      ed.className = "habit-edit";
+      const input = document.createElement("input");
+      input.type = "text"; input.maxLength = 60; input.className = "edit-name";
+      input.id = "edit-name-" + t.taskId; input.value = t.taskName;
+      const picker = document.createElement("div");
+      picker.className = "days"; picker.id = "edit-days-" + t.taskId;
+      for(const [d,lbl] of DAY_DEFS){
+        const b = document.createElement("button");
+        b.className = "day" + ((t.activeDays||[]).includes(d) ? " on" : "");
+        b.dataset.day = d; b.textContent = lbl;
+        b.onclick = () => b.classList.toggle("on");
+        picker.appendChild(b);
+      }
+      const actions = document.createElement("div");
+      actions.className = "edit-actions";
+      const save = document.createElement("button");
+      save.className = "btn-primary"; save.textContent = "Save";
+      save.onclick = () => saveEdit(t.taskId);
+      const cancel = document.createElement("button");
+      cancel.className = "btn-ghost"; cancel.textContent = "Cancel";
+      cancel.onclick = () => cancelEdit();
+      actions.append(save, cancel);
+      ed.append(input, picker, actions);
+      hl.appendChild(ed);
+      continue;
+    }
+    // ---- normal row ----
     const row = document.createElement("div");
     row.className = "habit-row";
     const days = (t.activeDays||[]).map(d => DAY_LABEL[d]).join(" ");
     row.innerHTML = `<div><div class="name"></div><div class="habit-days">${days}</div></div>`;
     row.querySelector(".name").textContent = t.taskName;
+    const btns = document.createElement("div");
+    btns.className = "habit-btns";
+    const edit = document.createElement("button");
+    edit.className = "btn-link edit-link"; edit.textContent = "Edit";
+    edit.onclick = () => startEdit(t.taskId);
     const del = document.createElement("button");
     del.className = "btn-link"; del.textContent = "Delete";
     del.onclick = () => deleteHabit(t.taskId);
-    row.appendChild(del);
+    btns.append(edit, del);
+    row.appendChild(btns);
     hl.appendChild(row);
   }
 }
