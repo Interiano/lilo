@@ -58,6 +58,24 @@
   .status.error { color: var(--danger); }
   .empty { color: var(--muted); padding: 8px 0; font-size: 0.9rem; }
   [hidden] { display: none !important; }
+
+  /* timer */
+  .timer-box { text-align: center; transition: background 0.2s; }
+  .timer-display { font-size: 2.6rem; font-weight: 800; color: var(--ink); letter-spacing: 2px; margin: 4px 0 14px; font-variant-numeric: tabular-nums; }
+  .timer-inputs { display: flex; gap: 8px; justify-content: center; margin-bottom: 14px; }
+  .timer-inputs input { width: 70px; text-align: center; font-size: 1.1rem; padding: 8px; margin: 0; }
+  .timer-inputs .sep { align-self: center; color: var(--muted); font-weight: 800; }
+  .timer-btns { display: flex; gap: 8px; justify-content: center; }
+  .timer-hint { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 2px; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20% { transform: translateX(-7px); }
+    40% { transform: translateX(7px); }
+    60% { transform: translateX(-5px); }
+    80% { transform: translateX(5px); }
+  }
+  .timer-box.alarm { background: #7f1d1d; cursor: pointer; animation: shake 0.4s ease-in-out infinite; }
+  .timer-box.alarm .timer-display { color: #fff; }
 </style>
 </head>
 <body>
@@ -81,6 +99,23 @@
         <button id="signout" class="btn-ghost" style="margin-left:auto;">Sign out</button>
       </div>
       <div class="nudge" id="nudge"></div>
+    </div>
+
+    <div class="card timer-box" id="timer-box">
+      <p class="section-title">Focus timer</p>
+      <div class="timer-inputs" id="timer-inputs">
+        <div><span class="timer-hint">Hr</span><input type="number" id="t-hours" min="0" max="23" value="0" /></div>
+        <span class="sep">:</span>
+        <div><span class="timer-hint">Min</span><input type="number" id="t-mins" min="0" max="59" value="25" /></div>
+        <span class="sep">:</span>
+        <div><span class="timer-hint">Sec</span><input type="number" id="t-secs" min="0" max="59" value="0" /></div>
+      </div>
+      <div class="timer-display" id="timer-display" hidden>00:00:00</div>
+      <div class="timer-btns">
+        <button id="t-start" class="btn-primary">Start</button>
+        <button id="t-pause" class="btn-ghost" hidden>Pause</button>
+        <button id="t-stop" class="btn-ghost" hidden>Stop</button>
+      </div>
     </div>
 
     <div class="card">
@@ -289,6 +324,67 @@ el("add-habit").onclick = addHabit;
 el("habit-name").addEventListener("keydown", (e) => { if(e.key === "Enter") addHabit(); });
 el("day-picker").addEventListener("click", (e) => {
   if(e.target.classList.contains("day")) e.target.classList.toggle("on");
+});
+
+// ── Focus timer (browser-only, resets on refresh) ──
+let timerId = null, secondsLeft = 0, timerPaused = false;
+
+function fmt(total){
+  const h = String(Math.floor(total/3600)).padStart(2,"0");
+  const m = String(Math.floor((total%3600)/60)).padStart(2,"0");
+  const s = String(total%60).padStart(2,"0");
+  return `${h}:${m}:${s}`;
+}
+function showTimerDisplay(on){
+  el("timer-display").hidden = !on;
+  el("timer-inputs").hidden = on;
+}
+function tick(){
+  secondsLeft--;
+  el("timer-display").textContent = fmt(secondsLeft);
+  if(secondsLeft <= 0){
+    clearInterval(timerId); timerId = null;
+    el("timer-box").classList.add("alarm");
+    el("timer-display").textContent = "Tap To Stop!";
+    el("t-pause").hidden = true; el("t-stop").hidden = true;
+  }
+}
+function startTimer(){
+  const h = parseInt(el("t-hours").value)||0;
+  const m = parseInt(el("t-mins").value)||0;
+  const s = parseInt(el("t-secs").value)||0;
+  secondsLeft = h*3600 + m*60 + s;
+  if(secondsLeft <= 0) return;
+  showTimerDisplay(true);
+  el("timer-display").textContent = fmt(secondsLeft);
+  el("t-start").hidden = true;
+  el("t-pause").hidden = false; el("t-pause").textContent = "Pause";
+  el("t-stop").hidden = false;
+  timerPaused = false;
+  timerId = setInterval(tick, 1000);
+}
+function pauseResume(){
+  if(timerPaused){
+    timerId = setInterval(tick, 1000);
+    timerPaused = false; el("t-pause").textContent = "Pause";
+  } else {
+    clearInterval(timerId); timerId = null;
+    timerPaused = true; el("t-pause").textContent = "Resume";
+  }
+}
+function stopTimer(){
+  clearInterval(timerId); timerId = null; timerPaused = false;
+  el("timer-box").classList.remove("alarm");
+  showTimerDisplay(false);
+  el("t-start").hidden = false;
+  el("t-pause").hidden = true; el("t-stop").hidden = true;
+}
+el("t-start").onclick = startTimer;
+el("t-pause").onclick = pauseResume;
+el("t-stop").onclick = stopTimer;
+// tap anywhere in the box to dismiss the alarm
+el("timer-box").addEventListener("click", (e) => {
+  if(el("timer-box").classList.contains("alarm")) stopTimer();
 });
 
 function showSignedIn(){ el("signed-out").hidden = true; el("signed-in").hidden = false; loadDashboard(); }
