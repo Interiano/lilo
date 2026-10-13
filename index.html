@@ -207,20 +207,55 @@ async function exchangeCode(code){
   if(!res.ok) throw new Error("Token exchange failed ("+res.status+")");
   return await res.json();
 }
+function saveTokens(tokens){
+  if(tokens.id_token)     localStorage.setItem("id_token", tokens.id_token);
+  if(tokens.access_token) localStorage.setItem("access_token", tokens.access_token);
+  // Cognito returns a refresh_token only on the initial code exchange, NOT on a refresh,
+  // so only overwrite it when one is actually present.
+  if(tokens.refresh_token) localStorage.setItem("refresh_token", tokens.refresh_token);
+}
+function clearTokens(){
+  localStorage.removeItem("id_token");
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+}
+const idToken = () => localStorage.getItem("id_token");
+
 function signOut(){
+  clearTokens();
   sessionStorage.clear();
   const u = new URL(CONFIG.userPoolDomain + "/logout");
   u.searchParams.set("client_id", CONFIG.clientId);
   u.searchParams.set("logout_uri", CONFIG.redirectUri);
   window.location.href = u.toString();
 }
-const idToken = () => sessionStorage.getItem("id_token");
 
-async function api(path, opts={}){
+// Swap the long-lived refresh token for a fresh id/access token — no user interaction.
+async function refreshTokens(){
+  const rt = localStorage.getItem("refresh_token");
+  if(!rt) return false;
+  try {
+    const body = new URLSearchParams({ grant_type:"refresh_token", client_id:CONFIG.clientId, refresh_token:rt });
+    const res = await fetch(CONFIG.userPoolDomain + "/oauth2/token", {
+      method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"}, body,
+    });
+    if(!res.ok) return false;      // refresh token expired/revoked → caller logs out
+    saveTokens(await res.json());
+    return true;
+  } catch(e){ return false; }
+}
+
+async function api(path, opts={}, _retried=false){
   const res = await fetch(CONFIG.apiUrl + path, {
     ...opts,
     headers: { "Authorization":"Bearer "+idToken(), "Content-Type":"application/json", ...(opts.headers||{}) },
   });
+  if(res.status === 401 && !_retried){
+    // Token likely expired — try one silent refresh, then retry the call once.
+    if(await refreshTokens()) return api(path, opts, true);
+    clearTokens(); showSignedOut();
+    throw new Error("Session expired — sign in again.");
+  }
   if(res.status === 401) throw new Error("Session expired — sign in again.");
   return res;
 }
@@ -487,13 +522,20 @@ function showSignedOut(){ el("signed-in").hidden = true; el("signed-out").hidden
   if(code){
     try {
       const tokens = await exchangeCode(code);
-      sessionStorage.setItem("id_token", tokens.id_token);
+      saveTokens(tokens);   // stores id_token + refresh_token (+ access_token)
       window.history.replaceState({}, document.title, CONFIG.redirectUri);
       showSignedIn();
     } catch(e){ showSignedOut(); status(e.message, true); }
     return;
   }
-  if(idToken()) showSignedIn(); else showSignedOut();
+  if(idToken()){
+    showSignedIn();                         // token may be expired; api() refreshes on first 401
+  } else if(localStorage.getItem("refresh_token")){
+    // Returning after the tab/browser was closed — get a fresh token silently.
+    if(await refreshTokens()) showSignedIn(); else { clearTokens(); showSignedOut(); }
+  } else {
+    showSignedOut();
+  }
 })();
 </script>
 </body>
