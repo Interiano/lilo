@@ -1,0 +1,8 @@
+# Terraform state & local cache — never commit these
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Build artifacts & test output
+*.zip
+output.json
